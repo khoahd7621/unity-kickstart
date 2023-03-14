@@ -1,29 +1,41 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-[RequireComponent(typeof(Rigidbody2D))]
+[RequireComponent(typeof(Rigidbody2D), typeof(TouchingDirection))]
 public class PlayerController : MonoBehaviour
 {
     public float walkSpeed = 5f;
     public float runSpeed = 8f;
+    public float airWalkSpeed = 3f;
+    public float jumpImpulse = 10f;
     Vector2 moveInput;
+    TouchingDirection touchingDirections;
 
     public float CurrentMoveSpeed
     {
         get
         {
-            if (IsMoving)
+            if (IsMoving && !touchingDirections.IsOnWall)
             {
-                if (IsRunning)
+                if (touchingDirections.IsGrounded)
                 {
-                    return runSpeed;
-                } else
-                {
-                    return walkSpeed;
+                    if (IsRunning)
+                    {
+                        return runSpeed;
+                    }
+                    else
+                    {
+                        return walkSpeed;
+                    }
                 }
-            } else
+                else
+                {
+                    // Air move
+                    return airWalkSpeed;
+                }
+
+            }
+            else
             {
                 // Idle speed is 0
                 return 0;
@@ -34,11 +46,14 @@ public class PlayerController : MonoBehaviour
     [SerializeField]
     private bool _isMoving = false;
 
-    public bool IsMoving { 
-        get {
+    public bool IsMoving
+    {
+        get
+        {
             return _isMoving;
         }
-        private set { 
+        private set
+        {
             _isMoving = value;
             animator.SetBool(AnimationStrings.isMoving, value);
         }
@@ -53,8 +68,8 @@ public class PlayerController : MonoBehaviour
         {
             return _isRunning;
         }
-        set 
-        { 
+        set
+        {
             _isRunning = value;
             animator.SetBool(AnimationStrings.isRunning, value);
         }
@@ -62,14 +77,15 @@ public class PlayerController : MonoBehaviour
 
     public bool _isFacingRight = true;
 
-    public bool IsFacingRight { 
-        get 
-        { 
+    public bool IsFacingRight
+    {
+        get
+        {
             return _isFacingRight;
-        } 
-        set 
-        { 
-            if (_isFacingRight != value) 
+        }
+        set
+        {
+            if (_isFacingRight != value)
             {
                 // Flip the local scale to make the player face the opposite direction
                 transform.localScale *= new Vector2(-1, 1);
@@ -85,23 +101,14 @@ public class PlayerController : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
-    }
-
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
+        touchingDirections = GetComponent<TouchingDirection>();
     }
 
     private void FixedUpdate()
     {
         rb.velocity = new Vector2(moveInput.x * CurrentMoveSpeed, rb.velocity.y);
+
+        animator.SetFloat(AnimationStrings.yVelocity, rb.velocity.y);
     }
 
     public void OnMove(InputAction.CallbackContext context)
@@ -119,7 +126,8 @@ public class PlayerController : MonoBehaviour
         {
             // Face the right
             IsFacingRight = true;
-        } else if (moveInput.x < 0 && IsFacingRight)
+        }
+        else if (moveInput.x < 0 && IsFacingRight)
         {
             // Face the left
             IsFacingRight = false;
@@ -131,9 +139,20 @@ public class PlayerController : MonoBehaviour
         if (context.started)
         {
             IsRunning = true;
-        } else if (context.canceled)
+        }
+        else if (context.canceled)
         {
             IsRunning = false;
+        }
+    }
+
+    public void OnJump(InputAction.CallbackContext context)
+    {
+        // TODO: Check if alive as well
+        if (context.started && touchingDirections.IsGrounded)
+        {
+            animator.SetTrigger(AnimationStrings.jump);
+            rb.velocity = new Vector2(rb.velocity.x, jumpImpulse);
         }
     }
 }
